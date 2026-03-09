@@ -70,8 +70,10 @@
 
 #![warn(missing_docs)]
 
-mod plugin_loader;
-mod error;
+/// Загрузчик плагинов
+pub mod plugin_loader;
+/// Обработчик ошибок
+pub mod error;
 
 use plugin_loader::Plugin;
 use std::ffi::CString;
