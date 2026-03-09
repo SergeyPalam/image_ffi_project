@@ -33,6 +33,7 @@ const INVALID_STRING: c_int = -1;
 const NULL_PTR: c_int = -2;
 const INVALID_JSON: c_int = -3;
 const INVALID_PARAMS: c_int = -4;
+const TO_BIG_IMAGE: c_int = -5;
 
 /// Основная функция обработки изображения — применяет размытие по заданным параметрам.
 ///
@@ -87,6 +88,9 @@ pub unsafe extern "C" fn process_image(
     rgba_data: *mut c_uchar,
     params: *const c_char,
 ) -> c_int{
+    let width = width as usize;
+    let height = height as usize;
+
     if rgba_data.is_null() || params.is_null() {
         return NULL_PTR;
     }
@@ -114,10 +118,12 @@ pub unsafe extern "C" fn process_image(
     let radius = params["radius"].as_u64().unwrap_or(1) as usize;
     let iterations = params["iterations"].as_u64().unwrap_or(1) as usize;
 
-    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize) };
+    // Проверка на переполнение для 32-битных систем
+    let Some(len) = width.checked_mul(height).and_then(|res| res.checked_mul(4)) else {
+        return TO_BIG_IMAGE;
+    };
 
-    let width = width as usize;
-    let height = height as usize;
+    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, len) };    
 
     for _ in 0..iterations {
         for y in 0..height {
