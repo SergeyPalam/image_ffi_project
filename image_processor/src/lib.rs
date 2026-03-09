@@ -70,14 +70,14 @@
 
 #![warn(missing_docs)]
 
-/// Загрузчик плагинов
-pub mod plugin_loader;
 /// Обработчик ошибок
 pub mod error;
+/// Загрузчик плагинов
+pub mod plugin_loader;
 
+use image::ImageFormat;
 use plugin_loader::Plugin;
 use std::ffi::CString;
-use image::ImageFormat;
 use std::path::Path;
 
 /// Обрабатывает изображение с использованием внешнего плагина.
@@ -135,15 +135,25 @@ use std::path::Path;
 /// - Альфа-канал (прозрачность) полностью поддерживается.
 /// - Для работы требуется, чтобы плагин был совместим с текущей архитектурой и ABI.
 
-pub fn process_image(input_path: &Path, output_path: &Path, plugin_path: &Path, params_path: &Path) -> Result<(), error::PluginError>{
+pub fn process_image(
+    input_path: &Path,
+    output_path: &Path,
+    plugin_path: &Path,
+    params_path: &Path,
+) -> Result<(), error::PluginError> {
     let mut rgba8 = image::open(input_path)?.into_rgba8();
 
     let params_str = std::fs::read_to_string(params_path)?;
     let params_str = CString::new(params_str)?;
     let plugin = Plugin::new(plugin_path)?;
     let plugin_interfase = plugin.interface()?;
-    
-    (plugin_interfase.process_image)(rgba8.width(), rgba8.height(), rgba8.as_mut_ptr(), params_str.as_ptr());
+
+    (plugin_interfase.process_image)(
+        rgba8.width(),
+        rgba8.height(),
+        rgba8.as_mut_ptr(),
+        params_str.as_ptr(),
+    );
 
     rgba8.save_with_format(output_path, ImageFormat::Png)?;
     Ok(())

@@ -13,9 +13,9 @@
 
 use libloading::{Library, Symbol};
 
-use std::ffi::{c_ulong, c_char, c_uchar};
-use std::path::Path;
 use super::error::PluginError;
+use std::ffi::{c_char, c_uchar, c_ulong};
+use std::path::Path;
 
 /// Интерфейс плагина.
 #[repr(C)]
@@ -34,7 +34,15 @@ pub struct PluginInterface<'a> {
     /// ```
     ///
     /// Плагин обязан экспортировать функцию с именем `process_image`.
-    pub process_image: Symbol<'a, extern "C" fn(width: c_ulong, height: c_ulong, rgba_data: *mut c_uchar, params: *const c_char)>,
+    pub process_image: Symbol<
+        'a,
+        extern "C" fn(
+            width: c_ulong,
+            height: c_ulong,
+            rgba_data: *mut c_uchar,
+            params: *const c_char,
+        ),
+    >,
 }
 
 /// Обёртка над динамической библиотекой плагина.
@@ -106,4 +114,4 @@ impl Plugin {
             process_image: unsafe { self.plugin.get("process_image") }?,
         })
     }
-} 
+}

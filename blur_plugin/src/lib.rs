@@ -1,4 +1,3 @@
-
 //! # Blur Plugin
 //!
 //! Это нативный C-compatible плагин для размытия изображений в формате RGBA.
@@ -25,9 +24,9 @@
 
 #![warn(missing_docs)]
 
-use std::ffi::{c_ulong, c_char, c_uchar};
-use std::ffi::CStr;
 use serde_json;
+use std::ffi::CStr;
+use std::ffi::{c_char, c_uchar, c_ulong};
 
 /// Основная функция обработки изображения — применяет размытие по заданным параметрам.
 ///
@@ -74,19 +73,20 @@ use serde_json;
 /// - Большой радиус может значительно замедлить обработку из-за `O(n²)` сложности на пиксель.
 /// - Прозрачность (альфа-канал) также участвует в размытии.
 ///
-#[unsafe(no_mangle)]    
-pub extern "C" fn process_image(width: c_ulong, height: c_ulong, rgba_data: *mut c_uchar, params: *const c_char) {
-    let params_str = unsafe {
-        CStr::from_ptr(params).to_str().unwrap()
-    };
+#[unsafe(no_mangle)]
+pub extern "C" fn process_image(
+    width: c_ulong,
+    height: c_ulong,
+    rgba_data: *mut c_uchar,
+    params: *const c_char,
+) {
+    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
     println!("Length: {}", params_str.len());
     let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
     let radius = params["radius"].as_u64().unwrap_or(1) as usize;
     let iterations = params["iterations"].as_u64().unwrap_or(1) as usize;
 
-    let data = unsafe {
-        std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize)
-    };
+    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize) };
 
     let width = width as usize;
     let height = height as usize;
@@ -102,7 +102,8 @@ pub extern "C" fn process_image(width: c_ulong, height: c_ulong, rgba_data: *mut
 
                 for dy in y.saturating_sub(radius)..std::cmp::min(height, y + radius + 1) {
                     for dx in x.saturating_sub(radius)..std::cmp::min(width, x + radius + 1) {
-                        let distance = ((dx as i32 - x as i32).pow(2) + (dy as i32 - y as i32).pow(2)) as f32;
+                        let distance =
+                            ((dx as i32 - x as i32).pow(2) + (dy as i32 - y as i32).pow(2)) as f32;
                         let weight = if distance == 0.0 { 1.0 } else { 1.0 / distance };
                         let weight_u32 = (weight * 1000.0) as u32; // Масштабируем для использования целых чисел
 
@@ -136,13 +137,13 @@ mod tests {
     fn test_blur_simple() {
         // Создаем изображение 3x3 с центральным белым пикселем
         let mut data = vec![
-            255, 0, 0, 255,     // Красный
-            0, 255, 0, 255,     // Зеленый
-            0, 0, 255, 255,     // Синий
-            255, 255, 0, 255,   // Желтый
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
+            0, 0, 255, 255, // Синий
+            255, 255, 0, 255, // Желтый
             255, 255, 255, 255, // Белый (центр)
-            255, 0, 255, 255,   // Пурпурный
-            0, 255, 255, 255,   // Голубой
+            255, 0, 255, 255, // Пурпурный
+            0, 255, 255, 255, // Голубой
             128, 128, 128, 255, // Серый
             255, 255, 255, 255, // Белый
         ];
@@ -152,7 +153,7 @@ mod tests {
         let params = CString::new(params).unwrap();
 
         let data_ptr = data.as_mut_ptr();
-        
+
         process_image(width, height, data_ptr, params.as_ptr());
 
         // Центральный пиксель должен стать средним цветом окружающих
@@ -165,9 +166,9 @@ mod tests {
     fn test_blur_radius_and_iterations() {
         // Простое изображение 2x2
         let mut data = vec![
-            255, 0, 0, 255,   // Красный
-            0, 255, 0, 255,   // Зеленый
-            0, 0, 255, 255,   // Синий
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
+            0, 0, 255, 255, // Синий
             255, 255, 0, 255, // Желтый
         ];
         let width = 2;
@@ -176,7 +177,7 @@ mod tests {
         let params = CString::new(params).unwrap();
 
         let data_ptr = data.as_mut_ptr();
-        
+
         process_image(width, height, data_ptr, params.as_ptr());
 
         // При двух итерациях размытие должно быть сильнее

@@ -75,9 +75,9 @@
 
 #![warn(missing_docs)]
 
-use std::ffi::{c_ulong, c_char, c_uchar};
-use std::ffi::CStr;
 use serde_json;
+use std::ffi::CStr;
+use std::ffi::{c_char, c_uchar, c_ulong};
 
 /// Основная функция обработки изображения — применяет зеркальное отражение по заданным осям.
 ///
@@ -122,18 +122,19 @@ use serde_json;
 /// - `test_mirror_vertical`
 /// - `test_mirror_both`
 ///
-#[unsafe(no_mangle)]    
-pub extern "C" fn process_image(width: c_ulong, height: c_ulong, rgba_data: *mut c_uchar, params: *const c_char) {
-    let params_str = unsafe {
-        CStr::from_ptr(params).to_str().unwrap()
-    };
+#[unsafe(no_mangle)]
+pub extern "C" fn process_image(
+    width: c_ulong,
+    height: c_ulong,
+    rgba_data: *mut c_uchar,
+    params: *const c_char,
+) {
+    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
     let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
     let horizontal = params["horizontal"].as_bool().unwrap_or(false);
     let vertical = params["vertical"].as_bool().unwrap_or(false);
 
-    let data = unsafe {
-        std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize)
-    };
+    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize) };
 
     let width = width as usize;
     let height = height as usize;
@@ -193,17 +194,17 @@ mod tests {
     #[test]
     fn test_mirror_horizontal() {
         let mut data = vec![
-            255, 0, 0, 255,   // Красный
-            0, 255, 0, 255,   // Зеленый
-            0, 0, 255, 255,   // Синий
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
+            0, 0, 255, 255, // Синий
             255, 255, 0, 255, // Желтый
         ];
 
         let expected = vec![
-            0, 255, 0, 255,   // Зеленый
-            255, 0, 0, 255,   // Красный
+            0, 255, 0, 255, // Зеленый
+            255, 0, 0, 255, // Красный
             255, 255, 0, 255, // Желтый
-            0, 0, 255, 255,   // Синий
+            0, 0, 255, 255, // Синий
         ];
 
         let width = 2;
@@ -212,7 +213,7 @@ mod tests {
         let params = CString::new(params).unwrap();
 
         let data_ptr = data.as_mut_ptr();
-        
+
         process_image(width, height, data_ptr, params.as_ptr());
 
         assert_eq!(data, expected);
@@ -221,17 +222,17 @@ mod tests {
     #[test]
     fn test_mirror_vertical() {
         let mut data = vec![
-            255, 0, 0, 255,   // Красный
-            0, 255, 0, 255,   // Зеленый
-            0, 0, 255, 255,   // Синий
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
+            0, 0, 255, 255, // Синий
             255, 255, 0, 255, // Желтый
         ];
 
         let expected = vec![
-            0, 0, 255, 255,   // Синий
+            0, 0, 255, 255, // Синий
             255, 255, 0, 255, // Желтый
-            255, 0, 0, 255,   // Красный
-            0, 255, 0, 255,   // Зеленый
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
         ];
 
         let width = 2;
@@ -240,7 +241,7 @@ mod tests {
         let params = CString::new(params).unwrap();
 
         let data_ptr = data.as_mut_ptr();
-        
+
         process_image(width, height, data_ptr, params.as_ptr());
 
         assert_eq!(data, expected);
@@ -249,17 +250,17 @@ mod tests {
     #[test]
     fn test_mirror_both() {
         let mut data = vec![
-            255, 0, 0, 255,   // Красный
-            0, 255, 0, 255,   // Зеленый
-            0, 0, 255, 255,   // Синий
+            255, 0, 0, 255, // Красный
+            0, 255, 0, 255, // Зеленый
+            0, 0, 255, 255, // Синий
             255, 255, 0, 255, // Желтый
         ];
 
         let expected = vec![
             255, 255, 0, 255, // Желтый
-            0, 0, 255, 255,   // Синий
-            0, 255, 0, 255,   // Зеленый
-            255, 0, 0, 255,   // Красный
+            0, 0, 255, 255, // Синий
+            0, 255, 0, 255, // Зеленый
+            255, 0, 0, 255, // Красный
         ];
 
         let width = 2;
@@ -268,7 +269,7 @@ mod tests {
         let params = CString::new(params).unwrap();
 
         let data_ptr = data.as_mut_ptr();
-        
+
         process_image(width, height, data_ptr, params.as_ptr());
 
         assert_eq!(data, expected);
