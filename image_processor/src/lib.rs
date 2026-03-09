@@ -148,12 +148,14 @@ pub fn process_image(
     let plugin = Plugin::new(plugin_path)?;
     let plugin_interfase = plugin.interface()?;
 
-    (plugin_interfase.process_image)(
-        rgba8.width(),
-        rgba8.height(),
-        rgba8.as_mut_ptr(),
-        params_str.as_ptr(),
-    );
+    unsafe {
+        (plugin_interfase.process_image)(
+            rgba8.width(),
+            rgba8.height(),
+            rgba8.as_mut_ptr(),
+            params_str.as_ptr(),
+        );
+    }
 
     rgba8.save_with_format(output_path, ImageFormat::Png)?;
     Ok(())

@@ -74,7 +74,7 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - Прозрачность (альфа-канал) также участвует в размытии.
 ///
 #[unsafe(no_mangle)]
-pub extern "C" fn process_image(
+pub unsafe extern "C" fn process_image(
     width: c_ulong,
     height: c_ulong,
     rgba_data: *mut c_uchar,
@@ -154,7 +154,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         // Центральный пиксель должен стать средним цветом окружающих
         let center_idx = (1 * 3 + 1) * 4; // [1][1]
@@ -178,8 +180,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
-
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
         // При двух итерациях размытие должно быть сильнее
         // Все пиксели должны стать более однородными
         for i in 0..4 {

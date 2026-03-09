@@ -123,7 +123,7 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - `test_mirror_both`
 ///
 #[unsafe(no_mangle)]
-pub extern "C" fn process_image(
+pub unsafe extern "C" fn process_image(
     width: c_ulong,
     height: c_ulong,
     rgba_data: *mut c_uchar,
@@ -214,7 +214,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }
@@ -242,7 +244,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }
@@ -270,7 +274,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }

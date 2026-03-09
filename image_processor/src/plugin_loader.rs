@@ -36,7 +36,7 @@ pub struct PluginInterface<'a> {
     /// Плагин обязан экспортировать функцию с именем `process_image`.
     pub process_image: Symbol<
         'a,
-        extern "C" fn(
+        unsafe extern "C" fn(
             width: c_ulong,
             height: c_ulong,
             rgba_data: *mut c_uchar,
