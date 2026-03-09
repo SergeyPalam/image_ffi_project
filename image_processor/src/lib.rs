@@ -77,7 +77,7 @@ pub mod plugin_loader;
 
 use image::ImageFormat;
 use plugin_loader::Plugin;
-use std::ffi::CString;
+use std::ffi::{CString, c_ulong};
 use std::path::Path;
 
 /// Обрабатывает изображение с использованием внешнего плагина.
@@ -150,8 +150,8 @@ pub fn process_image(
 
     unsafe {
         (plugin_interfase.process_image)(
-            rgba8.width(),
-            rgba8.height(),
+            rgba8.width() as c_ulong,
+            rgba8.height() as c_ulong,
             rgba8.as_mut_ptr(),
             params_str.as_ptr(),
         );
