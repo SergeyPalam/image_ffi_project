@@ -14,7 +14,7 @@
 use libloading::{Library, Symbol};
 
 use super::error::PluginError;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
 use std::path::Path;
 
 /// Интерфейс плагина.
@@ -41,7 +41,7 @@ pub struct PluginInterface<'a> {
             height: c_ulong,
             rgba_data: *mut c_uchar,
             params: *const c_char,
-        ),
+        ) -> c_int,
     >,
 }
 

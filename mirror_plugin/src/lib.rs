@@ -77,7 +77,13 @@
 
 use serde_json;
 use std::ffi::CStr;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
+
+const SUCCESS: c_int = 0;
+const INVALID_STRING: c_int = -1;
+const NULL_PTR: c_int = -2;
+const INVALID_JSON: c_int = -3;
+const INVALID_PARAMS: c_int = -4;
 
 /// Основная функция обработки изображения — применяет зеркальное отражение по заданным осям.
 ///
@@ -111,9 +117,8 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 ///   - Чтение строки параметров через `CStr::from_ptr`.
 ///   - Прямой доступ к памяти через `std::slice::from_raw_parts_mut`.
 /// - Вызывающий должен гарантировать:
-///   - Корректность указателей.
-///   - Валидность JSON.
-///   - Размер буфера `rgba_data`.
+///   - C-строка параметров - это null-терминированная строка.
+///   - Размер буфера `rgba_data` должен быть width * height * 4.
 ///
 /// # Примеры (в тестах)
 ///
@@ -128,9 +133,31 @@ pub unsafe extern "C" fn process_image(
     height: c_ulong,
     rgba_data: *mut c_uchar,
     params: *const c_char,
-) {
-    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
-    let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
+) -> c_int{
+    if rgba_data.is_null() || params.is_null() {
+        return NULL_PTR;
+    }
+
+    if width == 0 || height == 0 {
+        return INVALID_PARAMS;
+    }
+    
+   let params_str = unsafe {
+        match CStr::from_ptr(params).to_str() {
+            Ok(val) => val,
+            Err(_) => {
+                return INVALID_STRING;
+            }
+        }
+    };
+
+    let params: serde_json::Value = match serde_json::from_str(params_str){
+        Ok(val) => val,
+        Err(_) => {
+            return INVALID_JSON;
+        }
+    };
+
     let horizontal = params["horizontal"].as_bool().unwrap_or(false);
     let vertical = params["vertical"].as_bool().unwrap_or(false);
 
@@ -184,6 +211,8 @@ pub unsafe extern "C" fn process_image(
             }
         }
     }
+    
+    SUCCESS
 }
 
 #[cfg(test)]

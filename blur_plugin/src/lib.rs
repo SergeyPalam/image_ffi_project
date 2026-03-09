@@ -26,7 +26,13 @@
 
 use serde_json;
 use std::ffi::CStr;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
+
+const SUCCESS: c_int = 0;
+const INVALID_STRING: c_int = -1;
+const NULL_PTR: c_int = -2;
+const INVALID_JSON: c_int = -3;
+const INVALID_PARAMS: c_int = -4;
 
 /// Основная функция обработки изображения — применяет размытие по заданным параметрам.
 ///
@@ -56,8 +62,9 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - Функция использует `unsafe` для:
 ///   - чтения C-строки через `CStr::from_ptr`
 ///   - доступа к сырым буферам пикселей
-/// - Предполагается, что все указатели корректны и данные валидны.
-/// - В случае невалидного JSON или повреждённых данных поведение не определено.
+/// - Вызывающий должен гарантировать:
+///   - C-строка параметров - это null-терминированная строка.
+///   - Размер буфера `rgba_data` должен быть width * height * 4.
 ///
 /// # Пример использования (на стороне C)
 ///
@@ -79,10 +86,31 @@ pub unsafe extern "C" fn process_image(
     height: c_ulong,
     rgba_data: *mut c_uchar,
     params: *const c_char,
-) {
-    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
-    println!("Length: {}", params_str.len());
-    let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
+) -> c_int{
+    if rgba_data.is_null() || params.is_null() {
+        return NULL_PTR;
+    }
+
+    if width == 0 || height == 0 {
+        return INVALID_PARAMS;
+    }
+
+    let params_str = unsafe {
+        match CStr::from_ptr(params).to_str() {
+            Ok(val) => val,
+            Err(_) => {
+                return INVALID_STRING;
+            }
+        }
+    };
+
+    let params: serde_json::Value = match serde_json::from_str(params_str){
+        Ok(val) => val,
+        Err(_) => {
+            return INVALID_JSON;
+        }
+    };
+
     let radius = params["radius"].as_u64().unwrap_or(1) as usize;
     let iterations = params["iterations"].as_u64().unwrap_or(1) as usize;
 
@@ -126,6 +154,8 @@ pub unsafe extern "C" fn process_image(
             }
         }
     }
+
+    SUCCESS
 }
 
 #[cfg(test)]
