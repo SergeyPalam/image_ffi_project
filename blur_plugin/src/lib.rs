@@ -26,7 +26,14 @@
 
 use serde_json;
 use std::ffi::CStr;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
+
+const SUCCESS: c_int = 0;
+const INVALID_STRING: c_int = -1;
+const NULL_PTR: c_int = -2;
+const INVALID_JSON: c_int = -3;
+const INVALID_PARAMS: c_int = -4;
+const TO_BIG_IMAGE: c_int = -5;
 
 /// Основная функция обработки изображения — применяет размытие по заданным параметрам.
 ///
@@ -56,8 +63,9 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - Функция использует `unsafe` для:
 ///   - чтения C-строки через `CStr::from_ptr`
 ///   - доступа к сырым буферам пикселей
-/// - Предполагается, что все указатели корректны и данные валидны.
-/// - В случае невалидного JSON или повреждённых данных поведение не определено.
+/// - Вызывающий должен гарантировать:
+///   - C-строка параметров - это null-терминированная строка.
+///   - Размер буфера `rgba_data` должен быть width * height * 4.
 ///
 /// # Пример использования (на стороне C)
 ///
@@ -74,49 +82,74 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - Прозрачность (альфа-канал) также участвует в размытии.
 ///
 #[unsafe(no_mangle)]
-pub extern "C" fn process_image(
+pub unsafe extern "C" fn process_image(
     width: c_ulong,
     height: c_ulong,
     rgba_data: *mut c_uchar,
     params: *const c_char,
-) {
-    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
-    println!("Length: {}", params_str.len());
-    let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
+) -> c_int{
+    let width = width as usize;
+    let height = height as usize;
+    
+    if rgba_data.is_null() || params.is_null() {
+        return NULL_PTR;
+    }
+
+    if width == 0 || height == 0 {
+        return INVALID_PARAMS;
+    }
+
+    let params_str = unsafe {
+        match CStr::from_ptr(params).to_str() {
+            Ok(val) => val,
+            Err(_) => {
+                return INVALID_STRING;
+            }
+        }
+    };
+
+    let params: serde_json::Value = match serde_json::from_str(params_str){
+        Ok(val) => val,
+        Err(_) => {
+            return INVALID_JSON;
+        }
+    };
+
     let radius = params["radius"].as_u64().unwrap_or(1) as usize;
     let iterations = params["iterations"].as_u64().unwrap_or(1) as usize;
 
-    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize) };
+    // Проверка на переполнение для 32-битных систем
+    let Some(len) = (width as usize).checked_mul(height as usize).and_then(|res| res.checked_mul(4)) else {
+        return TO_BIG_IMAGE;
+    };
 
-    let width = width as usize;
-    let height = height as usize;
+    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, len) };    
 
     for _ in 0..iterations {
         for y in 0..height {
             for x in 0..width {
-                let mut r = 0u32;
-                let mut g = 0u32;
-                let mut b = 0u32;
-                let mut a = 0u32;
-                let mut total_weight = 0u32;
+                let mut r = 0;
+                let mut g = 0;
+                let mut b = 0;
+                let mut a = 0;
+                let mut total_weight = 0;
 
                 for dy in y.saturating_sub(radius)..std::cmp::min(height, y + radius + 1) {
                     for dx in x.saturating_sub(radius)..std::cmp::min(width, x + radius + 1) {
-                        let distance =
-                            ((dx as i32 - x as i32).pow(2) + (dy as i32 - y as i32).pow(2)) as f32;
+                        let distance = (((dx as isize - x as isize).pow(2)) + ((dy as isize - y as isize).pow(2))) as f32;
                         let weight = if distance == 0.0 { 1.0 } else { 1.0 / distance };
-                        let weight_u32 = (weight * 1000.0) as u32; // Масштабируем для использования целых чисел
+                        let weight_usize = (weight * 1000.0) as usize; // Масштабируем для использования целых чисел
 
-                        let idx = (dy * width + dx) * 4;
-                        r += (data[idx] as u32) * weight_u32;
-                        g += (data[idx + 1] as u32) * weight_u32;
-                        b += (data[idx + 2] as u32) * weight_u32;
-                        a += (data[idx + 3] as u32) * weight_u32;
-                        total_weight += weight_u32;
+                        let idx = ((dy * width + dx) * 4) as usize;
+                        r += (data[idx] as usize) * weight_usize;
+                        g += (data[idx + 1] as usize) * weight_usize;
+                        b += (data[idx + 2] as usize) * weight_usize;
+                        a += (data[idx + 3] as usize) * weight_usize;
+                        total_weight += weight_usize;
                     }
                 }
 
-                let idx = (y * width + x) * 4;
+                let idx = ((y * width + x) * 4) as usize;
                 if total_weight > 0 {
                     data[idx] = (r / total_weight) as u8;
                     data[idx + 1] = (g / total_weight) as u8;
@@ -126,6 +159,8 @@ pub extern "C" fn process_image(
             }
         }
     }
+
+    SUCCESS
 }
 
 #[cfg(test)]
@@ -154,7 +189,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         // Центральный пиксель должен стать средним цветом окружающих
         let center_idx = (1 * 3 + 1) * 4; // [1][1]
@@ -178,8 +215,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
-
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
         // При двух итерациях размытие должно быть сильнее
         // Все пиксели должны стать более однородными
         for i in 0..4 {

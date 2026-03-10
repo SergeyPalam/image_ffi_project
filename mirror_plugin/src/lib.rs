@@ -77,7 +77,14 @@
 
 use serde_json;
 use std::ffi::CStr;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
+
+const SUCCESS: c_int = 0;
+const INVALID_STRING: c_int = -1;
+const NULL_PTR: c_int = -2;
+const INVALID_JSON: c_int = -3;
+const INVALID_PARAMS: c_int = -4;
+const TO_BIG_IMAGE: c_int = -5;
 
 /// Основная функция обработки изображения — применяет зеркальное отражение по заданным осям.
 ///
@@ -111,9 +118,8 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 ///   - Чтение строки параметров через `CStr::from_ptr`.
 ///   - Прямой доступ к памяти через `std::slice::from_raw_parts_mut`.
 /// - Вызывающий должен гарантировать:
-///   - Корректность указателей.
-///   - Валидность JSON.
-///   - Размер буфера `rgba_data`.
+///   - C-строка параметров - это null-терминированная строка.
+///   - Размер буфера `rgba_data` должен быть width * height * 4.
 ///
 /// # Примеры (в тестах)
 ///
@@ -123,21 +129,48 @@ use std::ffi::{c_char, c_uchar, c_ulong};
 /// - `test_mirror_both`
 ///
 #[unsafe(no_mangle)]
-pub extern "C" fn process_image(
+pub unsafe extern "C" fn process_image(
     width: c_ulong,
     height: c_ulong,
     rgba_data: *mut c_uchar,
     params: *const c_char,
-) {
-    let params_str = unsafe { CStr::from_ptr(params).to_str().unwrap() };
-    let params: serde_json::Value = serde_json::from_str(params_str).unwrap();
+) -> c_int{
+    let width = width as usize;
+    let height = height as usize;
+
+    if rgba_data.is_null() || params.is_null() {
+        return NULL_PTR;
+    }
+
+    if width == 0 || height == 0 {
+        return INVALID_PARAMS;
+    }
+    
+   let params_str = unsafe {
+        match CStr::from_ptr(params).to_str() {
+            Ok(val) => val,
+            Err(_) => {
+                return INVALID_STRING;
+            }
+        }
+    };
+
+    let params: serde_json::Value = match serde_json::from_str(params_str){
+        Ok(val) => val,
+        Err(_) => {
+            return INVALID_JSON;
+        }
+    };
+
     let horizontal = params["horizontal"].as_bool().unwrap_or(false);
     let vertical = params["vertical"].as_bool().unwrap_or(false);
 
-    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, (width * height * 4) as usize) };
+    // Проверка на переполнение для 32-битных систем
+    let Some(len) = width.checked_mul(height).and_then(|res| res.checked_mul(4)) else {
+        return TO_BIG_IMAGE;
+    };
 
-    let width = width as usize;
-    let height = height as usize;
+    let data = unsafe { std::slice::from_raw_parts_mut(rgba_data, len) };
 
     if horizontal && vertical {
         // Оба отражения — полный разворот
@@ -184,6 +217,8 @@ pub extern "C" fn process_image(
             }
         }
     }
+    
+    SUCCESS
 }
 
 #[cfg(test)]
@@ -214,7 +249,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }
@@ -242,7 +279,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }
@@ -270,7 +309,9 @@ mod tests {
 
         let data_ptr = data.as_mut_ptr();
 
-        process_image(width, height, data_ptr, params.as_ptr());
+        unsafe {
+            process_image(width, height, data_ptr, params.as_ptr());
+        }
 
         assert_eq!(data, expected);
     }

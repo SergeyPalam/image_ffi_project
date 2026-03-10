@@ -32,7 +32,8 @@ use thiserror::Error;
 /// match image_processor::process_image(
 ///     Path::new("input.png"),
 ///     Path::new("output.png"),
-///     Path::new("libblur_plugin.so"),
+///     Path::new("dir/to/plugin"),
+///     "plugin_name",
 ///     Path::new("params.json"),
 /// ) {
 ///     Ok(()) => println!("Успех!"),
@@ -45,14 +46,14 @@ pub enum PluginError {
     ///
     /// Возникает при повреждённом файле, поддерживаемом формате или других проблемах с библиотекой `image`.
     /// Автоматически преобразуется из `image::ImageError`.
-    #[error("File not found")]
+    #[error(transparent)]
     ConversionError(#[from] ImageError),
     /// Ошибка загрузки динамической библиотеки (плагина).
     ///
     /// Возникает, когда файл плагина не найден, имеет неверную архитектуру,
     /// или не содержит необходимой функции `process_image`.
     /// Автоматически преобразуется из `libloading::Error`.
-    #[error("Load library error")]
+    #[error(transparent)]
     LoadLibrary(#[from] libloading::Error),
     /// Индекс или значение вышло за допустимые пределы.
     ///
@@ -63,17 +64,17 @@ pub enum PluginError {
     ///
     /// Возникает, когда параметры JSON или путь к файлу содержат символ `\0`.
     /// Автоматически преобразуется из `std::ffi::NulError`.
-    #[error("Null error")]
+    #[error(transparent)]
     Null(#[from] NulError),
     /// Ошибка ввода-вывода.
     ///
     /// Возникает при чтении/записи файлов (например, файл не найден, нет прав доступа).
     /// Автоматически преобразуется из `std::io::Error`.
-    #[error("IO error")]
+    #[error(transparent)]
     IO(#[from] io::Error),
-    /// Неизвестная ошибка, для которой не найдено более точного описания.
+    /// Ошибка при работе с плагином.
     ///
-    /// Используется как запасной вариант, когда причина ошибки не может быть определена.
-    #[error("Unknown error")]
-    Unknown,
+    /// Возникает, когда плагин возвращает ошибку.
+    #[error("Unknown error: {0}")]
+    Library(String),
 }

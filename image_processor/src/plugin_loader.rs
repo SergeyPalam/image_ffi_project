@@ -11,10 +11,10 @@
 //!
 //! Это позволяет главному приложению `image_processor` вызывать код плагина без знания его внутренней реализации.
 
-use libloading::{Library, Symbol};
+use libloading::{Library, Symbol, library_filename};
 
 use super::error::PluginError;
-use std::ffi::{c_char, c_uchar, c_ulong};
+use std::ffi::{c_char, c_uchar, c_ulong, c_int};
 use std::path::Path;
 
 /// Интерфейс плагина.
@@ -36,12 +36,12 @@ pub struct PluginInterface<'a> {
     /// Плагин обязан экспортировать функцию с именем `process_image`.
     pub process_image: Symbol<
         'a,
-        extern "C" fn(
+        unsafe extern "C" fn(
             width: c_ulong,
             height: c_ulong,
             rgba_data: *mut c_uchar,
             params: *const c_char,
-        ),
+        ) -> c_int,
     >,
 }
 
@@ -75,14 +75,17 @@ impl Plugin {
     ///
     /// # Пример
     ///
-    /// ```
+    /// ``` no_run
     /// use std::path::Path;
-    /// let plugin = Plugin::new(Path::new("plugins/libblur_plugin.so"))
+    /// use image_processor::plugin_loader::Plugin;
+    /// 
+    /// let plugin = Plugin::new(Path::new("/dir/to/plugin"), "plugin_name")
     ///     .expect("Не удалось загрузить плагин");
     /// ```
-    pub fn new(filename: &Path) -> Result<Self, PluginError> {
+    pub fn new(plugin_dir: &Path, plugin_name: &str) -> Result<Self, PluginError> {
+        let lib_name = library_filename(plugin_name);
         Ok(Plugin {
-            plugin: unsafe { Library::new(filename) }?,
+            plugin: unsafe { Library::new(plugin_dir.join(lib_name)) }?,
         })
     }
     /// Получает интерфейс плагина, предоставляя доступ к экспортированным функциям.
@@ -104,7 +107,12 @@ impl Plugin {
     ///
     /// # Пример
     ///
-    /// ```
+    /// ``` no_run
+    /// use std::path::Path;
+    /// use image_processor::plugin_loader::Plugin;
+    /// 
+    /// let plugin = Plugin::new(Path::new("/dir/to/plugin"), "plugin_name")
+    ///     .expect("Не удалось загрузить плагин");
     /// let interface = plugin.interface()
     ///     .expect("Не удалось получить интерфейс плагина");
     /// // Теперь можно вызывать (interface.process_image)(...);

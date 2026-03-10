@@ -53,7 +53,7 @@ void process_image(
 `image_processor` можно использовать как библиотеку или через CLI-интерфейс:
 
 ```bash
-image_processor --input input.png --output output.png --shared-path plugins/libblur_plugin.so --params-path params.json
+image_processor --input input.png --output output.png --dir /dir/to/plugin --name plugin_name --params-path params.json
 ```
 
 ## Сборка
@@ -77,7 +77,7 @@ image_processor --input input.png --output output.png --shared-path plugins/libb
 
 3. Запуск с примером параметров:
    ```bash
-   ./target/debug/image_processor --input example/in.png --output out.png --shared-path blur_plugin/target/release/libblur_plugin.dll --params-path example/blur.json.txt
+   image_processor.exe -i in.png -o blur.png -d . -n blur_plugin -p blur.json.txt
    ```
 
 ## Примеры файлов параметров
