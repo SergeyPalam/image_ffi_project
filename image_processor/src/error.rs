@@ -46,14 +46,14 @@ pub enum PluginError {
     ///
     /// Возникает при повреждённом файле, поддерживаемом формате или других проблемах с библиотекой `image`.
     /// Автоматически преобразуется из `image::ImageError`.
-    #[error("File not found")]
+    #[error(transparent)]
     ConversionError(#[from] ImageError),
     /// Ошибка загрузки динамической библиотеки (плагина).
     ///
     /// Возникает, когда файл плагина не найден, имеет неверную архитектуру,
     /// или не содержит необходимой функции `process_image`.
     /// Автоматически преобразуется из `libloading::Error`.
-    #[error("Load library error")]
+    #[error(transparent)]
     LoadLibrary(#[from] libloading::Error),
     /// Индекс или значение вышло за допустимые пределы.
     ///
@@ -64,13 +64,13 @@ pub enum PluginError {
     ///
     /// Возникает, когда параметры JSON или путь к файлу содержат символ `\0`.
     /// Автоматически преобразуется из `std::ffi::NulError`.
-    #[error("Null error")]
+    #[error(transparent)]
     Null(#[from] NulError),
     /// Ошибка ввода-вывода.
     ///
     /// Возникает при чтении/записи файлов (например, файл не найден, нет прав доступа).
     /// Автоматически преобразуется из `std::io::Error`.
-    #[error("IO error")]
+    #[error(transparent)]
     IO(#[from] io::Error),
     /// Ошибка при работе с плагином.
     ///
