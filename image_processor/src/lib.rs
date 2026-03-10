@@ -54,7 +54,8 @@
 //! image_processor::process_image(
 //!     Path::new("input.png"),
 //!     Path::new("output.png"),
-//!     Path::new("plugins/libblur_plugin.so"),
+//!     Path::new("/dir/to/plugin"),
+//!     "plugin_name",
 //!     Path::new("params.json"),
 //! ).expect("Failed to process image");
 //! ```
@@ -77,8 +78,16 @@ pub mod plugin_loader;
 
 use image::ImageFormat;
 use plugin_loader::Plugin;
-use std::ffi::{CString, c_ulong};
+use std::ffi::{CString, c_ulong, c_int};
 use std::path::Path;
+use error::PluginError;
+
+const SUCCESS: c_int = 0;
+const INVALID_STRING: c_int = -1;
+const NULL_PTR: c_int = -2;
+const INVALID_JSON: c_int = -3;
+const INVALID_PARAMS: c_int = -4;
+const TO_BIG_IMAGE: c_int = -5;
 
 /// Обрабатывает изображение с использованием внешнего плагина.
 ///
@@ -88,7 +97,8 @@ use std::path::Path;
 ///
 /// - `input_path`: путь к входному изображению (поддерживаемые форматы: PNG, JPEG, BMP и др.).
 /// - `output_path`: путь, по которому будет сохранён результат (всегда в формате PNG).
-/// - `plugin_path`: путь к динамической библиотеке плагина (`.so`, `.dll`, `.dylib`).
+/// - `plugin_dir`: путь к директории динамической библиотеки плагина.
+/// - `plugin_name`: имя файла плагина (без расширения).
 /// - `params_path`: путь к JSON-файлу с параметрами для плагина.
 ///
 /// # Процесс обработки
@@ -121,7 +131,8 @@ use std::path::Path;
 /// match image_processor::process_image(
 ///     Path::new("in.jpg"),
 ///     Path::new("out.png"),
-///     Path::new("libblur_plugin.so"),
+///     Path::new("dir/to/plugin"),
+///     "plugin_name",
 ///     Path::new("blur_params.json"),
 /// ) {
 ///     Ok(()) => println!("Обработка успешна!"),
@@ -138,23 +149,45 @@ use std::path::Path;
 pub fn process_image(
     input_path: &Path,
     output_path: &Path,
-    plugin_path: &Path,
+    plugin_dir: &Path,
+    plugin_name: &str,
     params_path: &Path,
 ) -> Result<(), error::PluginError> {
     let mut rgba8 = image::open(input_path)?.into_rgba8();
 
     let params_str = std::fs::read_to_string(params_path)?;
     let params_str = CString::new(params_str)?;
-    let plugin = Plugin::new(plugin_path)?;
+    let plugin = Plugin::new(plugin_dir, plugin_name)?;
     let plugin_interfase = plugin.interface()?;
 
     unsafe {
-        (plugin_interfase.process_image)(
+        let res = (plugin_interfase.process_image)(
             rgba8.width() as c_ulong,
             rgba8.height() as c_ulong,
             rgba8.as_mut_ptr(),
             params_str.as_ptr(),
         );
+        match res {
+            SUCCESS => {}
+            INVALID_STRING => { 
+                return Err(PluginError::Library("Invalid string params".to_string()));
+            }
+            NULL_PTR => {
+                return Err(PluginError::Library("Null pointer exception".to_string()));
+            }
+            INVALID_PARAMS => {
+                return Err(PluginError::Library("Invalid params".to_string()));
+            }
+            TO_BIG_IMAGE => {
+                return Err(PluginError::Library("To big image".to_string()));
+            }
+            INVALID_JSON => {
+                return Err(PluginError::Library("Invalid json".to_string()));
+            }
+            _ => {
+                return Err(PluginError::Library("Unknown error".to_string()));
+            }
+        }
     }
 
     rgba8.save_with_format(output_path, ImageFormat::Png)?;

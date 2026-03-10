@@ -11,7 +11,7 @@
 //!
 //! Это позволяет главному приложению `image_processor` вызывать код плагина без знания его внутренней реализации.
 
-use libloading::{Library, Symbol};
+use libloading::{Library, Symbol, library_filename};
 
 use super::error::PluginError;
 use std::ffi::{c_char, c_uchar, c_ulong, c_int};
@@ -75,14 +75,17 @@ impl Plugin {
     ///
     /// # Пример
     ///
-    /// ```
+    /// ``` no_run
     /// use std::path::Path;
-    /// let plugin = Plugin::new(Path::new("plugins/libblur_plugin.so"))
+    /// use image_processor::plugin_loader::Plugin;
+    /// 
+    /// let plugin = Plugin::new(Path::new("/dir/to/plugin"), "plugin_name")
     ///     .expect("Не удалось загрузить плагин");
     /// ```
-    pub fn new(filename: &Path) -> Result<Self, PluginError> {
+    pub fn new(plugin_dir: &Path, plugin_name: &str) -> Result<Self, PluginError> {
+        
         Ok(Plugin {
-            plugin: unsafe { Library::new(filename) }?,
+            plugin: unsafe { Library::new(library_filename(plugin_dir.join(plugin_name))) }?,
         })
     }
     /// Получает интерфейс плагина, предоставляя доступ к экспортированным функциям.
@@ -104,7 +107,12 @@ impl Plugin {
     ///
     /// # Пример
     ///
-    /// ```
+    /// ``` no_run
+    /// use std::path::Path;
+    /// use image_processor::plugin_loader::Plugin;
+    /// 
+    /// let plugin = Plugin::new(Path::new("/dir/to/plugin"), "plugin_name")
+    ///     .expect("Не удалось загрузить плагин");
     /// let interface = plugin.interface()
     ///     .expect("Не удалось получить интерфейс плагина");
     /// // Теперь можно вызывать (interface.process_image)(...);

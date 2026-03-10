@@ -32,7 +32,8 @@ use thiserror::Error;
 /// match image_processor::process_image(
 ///     Path::new("input.png"),
 ///     Path::new("output.png"),
-///     Path::new("libblur_plugin.so"),
+///     Path::new("dir/to/plugin"),
+///     "plugin_name",
 ///     Path::new("params.json"),
 /// ) {
 ///     Ok(()) => println!("Успех!"),
@@ -71,9 +72,9 @@ pub enum PluginError {
     /// Автоматически преобразуется из `std::io::Error`.
     #[error("IO error")]
     IO(#[from] io::Error),
-    /// Неизвестная ошибка, для которой не найдено более точного описания.
+    /// Ошибка при работе с плагином.
     ///
-    /// Используется как запасной вариант, когда причина ошибки не может быть определена.
+    /// Возникает, когда плагин возвращает ошибку.
     #[error("Unknown error")]
-    Unknown,
+    Library(String),
 }
