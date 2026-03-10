@@ -75,6 +75,6 @@ pub enum PluginError {
     /// Ошибка при работе с плагином.
     ///
     /// Возникает, когда плагин возвращает ошибку.
-    #[error("Unknown error")]
+    #[error("Unknown error: {0}")]
     Library(String),
 }

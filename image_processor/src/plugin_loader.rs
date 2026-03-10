@@ -83,9 +83,9 @@ impl Plugin {
     ///     .expect("Не удалось загрузить плагин");
     /// ```
     pub fn new(plugin_dir: &Path, plugin_name: &str) -> Result<Self, PluginError> {
-        
+        let lib_name = library_filename(plugin_name);
         Ok(Plugin {
-            plugin: unsafe { Library::new(library_filename(plugin_dir.join(plugin_name))) }?,
+            plugin: unsafe { Library::new(plugin_dir.join(lib_name)) }?,
         })
     }
     /// Получает интерфейс плагина, предоставляя доступ к экспортированным функциям.
