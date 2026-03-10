@@ -90,7 +90,7 @@ pub unsafe extern "C" fn process_image(
 ) -> c_int{
     let width = width as usize;
     let height = height as usize;
-
+    
     if rgba_data.is_null() || params.is_null() {
         return NULL_PTR;
     }
@@ -119,7 +119,7 @@ pub unsafe extern "C" fn process_image(
     let iterations = params["iterations"].as_u64().unwrap_or(1) as usize;
 
     // Проверка на переполнение для 32-битных систем
-    let Some(len) = width.checked_mul(height).and_then(|res| res.checked_mul(4)) else {
+    let Some(len) = (width as usize).checked_mul(height as usize).and_then(|res| res.checked_mul(4)) else {
         return TO_BIG_IMAGE;
     };
 
@@ -128,29 +128,28 @@ pub unsafe extern "C" fn process_image(
     for _ in 0..iterations {
         for y in 0..height {
             for x in 0..width {
-                let mut r = 0u32;
-                let mut g = 0u32;
-                let mut b = 0u32;
-                let mut a = 0u32;
-                let mut total_weight = 0u32;
+                let mut r = 0;
+                let mut g = 0;
+                let mut b = 0;
+                let mut a = 0;
+                let mut total_weight = 0;
 
                 for dy in y.saturating_sub(radius)..std::cmp::min(height, y + radius + 1) {
                     for dx in x.saturating_sub(radius)..std::cmp::min(width, x + radius + 1) {
-                        let distance =
-                            ((dx as i32 - x as i32).pow(2) + (dy as i32 - y as i32).pow(2)) as f32;
+                        let distance = (((dx as isize - x as isize).pow(2)) + ((dy as isize - y as isize).pow(2))) as f32;
                         let weight = if distance == 0.0 { 1.0 } else { 1.0 / distance };
-                        let weight_u32 = (weight * 1000.0) as u32; // Масштабируем для использования целых чисел
+                        let weight_usize = (weight * 1000.0) as usize; // Масштабируем для использования целых чисел
 
-                        let idx = (dy * width + dx) * 4;
-                        r += (data[idx] as u32) * weight_u32;
-                        g += (data[idx + 1] as u32) * weight_u32;
-                        b += (data[idx + 2] as u32) * weight_u32;
-                        a += (data[idx + 3] as u32) * weight_u32;
-                        total_weight += weight_u32;
+                        let idx = ((dy * width + dx) * 4) as usize;
+                        r += (data[idx] as usize) * weight_usize;
+                        g += (data[idx + 1] as usize) * weight_usize;
+                        b += (data[idx + 2] as usize) * weight_usize;
+                        a += (data[idx + 3] as usize) * weight_usize;
+                        total_weight += weight_usize;
                     }
                 }
 
-                let idx = (y * width + x) * 4;
+                let idx = ((y * width + x) * 4) as usize;
                 if total_weight > 0 {
                     data[idx] = (r / total_weight) as u8;
                     data[idx + 1] = (g / total_weight) as u8;
